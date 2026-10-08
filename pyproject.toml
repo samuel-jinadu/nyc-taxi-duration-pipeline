@@ -1,0 +1,12 @@
+[project]
+name = "taxi-longest-trip"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "black>=26.10.0",
+    "ruff>=0.16.10",
+    "dagruff>=1.0.0"
+]
