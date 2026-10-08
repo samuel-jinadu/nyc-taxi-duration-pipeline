@@ -1,12 +1,14 @@
 services:
   airflow-standalone:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.app
     container_name: airflow_local_standalone
     environment:
-      - AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      - AIRFLOW__CORE__LOAD_EXAMPLES: False
-      - AIRFLOW__DAG_PROCESSOR__HEALTH_CHECK_THRESHOLD: 120
-      - AIRFLOW_CONN_SUMMARY_DB: postgresql://postgres:postgres@postgres:5432/summary
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DAG_PROCESSOR__HEALTH_CHECK_THRESHOLD=120
+      - AIRFLOW_CONN_SUMMARY_DB=postgresql://postgres:postgres@postgres:5432/summary
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -29,7 +31,12 @@ services:
       retries: 5
     ports: ["5432:5432"]
   streamlit:
-    image: streamlit:latest
-    enviroment:
-      POSTGRES_DSN: postgresql://postgres:postgres@postgres:5432/summary
-    ports: ["8080:8080"] # find a way to change this its competing with airflow
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    environment:
+        POSTGRES_DSN: postgresql://postgres:postgres@postgres:5432/summary
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - 8501:8501/tcp

@@ -61,6 +61,7 @@ find . \
         -name .ruff_cache -o \
         -name .tox -o \
         -name .eggs -o \
+        -name logs -o \
         -name "*.egg-info" -o \
         -name htmlcov -o \
         -name build -o \

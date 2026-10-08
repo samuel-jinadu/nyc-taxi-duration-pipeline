@@ -22,3 +22,4 @@ echo "Project root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT" || exit 1
 
 uv export --no-dev --no-hashes -o requirements.txt
+uv export --only-group streamlit --no-hashes -o requirements-streamlit.txt

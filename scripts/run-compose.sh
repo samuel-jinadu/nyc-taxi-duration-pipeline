@@ -37,4 +37,5 @@ sudo chown -R "$(id -u):0" logs plugins
 sudo chmod -R 775 logs plugins
 
 echo "Running docker compose"
+> compose.log
 docker compose up --no-color --timestamps 2>&1 | tee compose.log

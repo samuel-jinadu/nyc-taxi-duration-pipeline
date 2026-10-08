@@ -4,10 +4,13 @@ from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.python import PythonOperator
 import pendulum
 import pandas as pd
-import pyarrow
+# import pyarrow
+from pyarrow import parquet, csv
 from airflow.sdk.bases.hook import BaseHook
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from datetime import timedelta
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
 
 default_args = {
     "retries": 3,
@@ -38,8 +41,8 @@ with DAG(
     def _convert_pq_to_csv():
         columns=["tpep_pickup_datetime","tpep_dropoff_datetime","trip_distance","PULocationID","DOLocationID"]
         
-        table = pyarrow.parquet .read_table(f"/data/taxi-data-raw.parquet", columns=columns)
-        pyarrow.csv.write_csv(table, "/data/taxi-data-raw.csv")
+        table = parquet .read_table(f"/data/taxi-data-raw.parquet", columns=columns)
+        csv.write_csv(table, "/data/taxi-data-raw.csv")
 
     convert_parquet_to_csv = PythonOperator(
         task_id = "convert_parquet_to_csv",
@@ -60,7 +63,10 @@ with DAG(
             df.groupby("PULocationID")["trip_duration"]
                 .mean()
                 .reset_index()
-                .rename(columns={"trip_duration": "avg_duration_seconds"})
+                .rename(columns={
+                    "trip_duration": "avg_duration_seconds", 
+                    "PULocationID": "pickup_locationid"
+                    })
             )
 
         summary_df.to_csv("/data/taxi_summary.csv", index=False)
@@ -76,9 +82,8 @@ with DAG(
 
         df["execution_date"] = context["data_interval_start"].date()
 
-        engine = create_engine(
-            BaseHook.get_connection("summary_db").get_uri()
-        )
+        hook = PostgresHook(postgres_conn_id="summary_db")
+        engine = hook.get_sqlalchemy_engine()
 
         with engine.begin() as conn:
             query1 = """
@@ -88,12 +93,12 @@ with DAG(
                     execution_date DATE
                 );
             """
-            conn.execute(query1)
+            conn.execute(text(query1))
 
             query2 = """
-                DELETE FROM taxi_zone_durations WHERE execution_date = %s
+                DELETE FROM taxi_zone_durations WHERE execution_date = :execution_date
             """
-            conn.execute(query2, (context["data_interval_start"].date()))
+            conn.execute(text(query2), {"execution_date": context["data_interval_start"].date()})
 
             df.to_sql( "taxi_zone_durations", con=conn, if_exists="append", index=False) 
 

@@ -9,7 +9,7 @@ RUN if [ -s /tmp/requirements.txt ]; then \
 # Copy the startup script and make it executable
 COPY ./scripts/start-airflow.sh /start-airflow.sh
 USER root
-RUN mkdir /data
+RUN mkdir /data && chown airflow:0 /data
 RUN chmod +x /start-airflow.sh
 USER airflow
 
