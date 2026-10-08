@@ -3,15 +3,33 @@ services:
     build: .
     container_name: airflow_local_standalone
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__DAG_PROCESSOR__HEALTH_CHECK_THRESHOLD=120
+      - AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES: False
+      - AIRFLOW__DAG_PROCESSOR__HEALTH_CHECK_THRESHOLD: 120
+      - AIRFLOW_CONN_SUMMARY_DB: postgresql://postgres:postgres@postgres:5432/summary
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./airflow_passwords.json:/opt/airflow/simple_auth_manager_passwords.json.generated
+
     ports:
       - "8080:8080"
     # command: standalone
     user: "${AIRFLOW_UID}:0"
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: summary
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d summary"]
+      interval: 5s
+      retries: 5
+    ports: ["5432:5432"]
+  streamlit:
+    image: streamlit:latest
+    enviroment:
+      POSTGRES_DSN: postgresql://postgres:postgres@postgres:5432/summary
+    ports: ["8080:8080"] # find a way to change this its competing with airflow

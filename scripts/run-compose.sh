@@ -28,6 +28,8 @@ PROJECT_ROOT="$(get_project_root "$SCRIPT_DIR")"
 echo "Project root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT" || exit 1
 
+bash ./scripts/gen-req.sh
+
 # permission issues that can cause the dag processor to fail silently
 echo "Ensuring logs/ and plugins/ are writable by the container (uid ${AIRFLOW_UID:-50000}:0)..."
 mkdir -p logs plugins dags
