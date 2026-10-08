@@ -10,7 +10,7 @@ def say_hello():
 
 with DAG(
     dag_id="00_hello",
-    start_date=pendulum.today("UTC").add(days=-1),
+    start_date=pendulum.datetime(2026, 10, 7, tz="UTC"),
     schedule=None,
 ):
     PythonOperator(

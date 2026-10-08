@@ -88,7 +88,6 @@ find . \
         ! -name "*.snappy.parquet" \
         ! -name "*.avro" \
         ! -name "*.orc" \
-        ! -name "*.log" \
         ! -name "*.ipynb" \
         ! -name ".coverage" \
         ! -name ".DS_Store" \

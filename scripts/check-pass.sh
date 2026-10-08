@@ -1,0 +1,1 @@
+docker logs airflow_local_standalone 2>&1 | grep -i password
