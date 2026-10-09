@@ -1,0 +1,1 @@
+docker compose build --no-cache airflow-standalone streamlit postgres

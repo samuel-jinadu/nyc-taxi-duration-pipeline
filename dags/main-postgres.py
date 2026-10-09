@@ -48,9 +48,9 @@ with DAG(
         )
 
     get_taxi_shapefile_script = """
-        url = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
+        url="https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
         wget "${url}" -O "/data/taxi-zones.zip"
-        python -c "import zipfile; zipfile.ZipFile('/data/taxi-zones.zip').extractall('/data/taxi-zones')"
+        python -c "import zipfile; zipfile.ZipFile('/data/taxi-zones.zip').extractall('/data')"
     """
 
     get_taxi_shapefile = BashOperator(
@@ -59,7 +59,7 @@ with DAG(
         )
 
     def _convert_shapefile_to_geojson():
-        shapefile_path = "/data/taxi-zones/taxi_zones.shp"
+        shapefile_path = "/data/taxi_zones/taxi_zones.shp"
         geojson_path = "/data/taxi-zones.geojson"
         gdf = gpd.read_file(shapefile_path).to_crs(4326)
         gdf.to_file(geojson_path, driver="GeoJSON")
@@ -86,13 +86,19 @@ with DAG(
         taxi_records_df = pd.read_csv("/data/taxi-data-raw.csv")
         taxi_lookup_df = pd.read_csv("/data/taxi-zone-lookup.csv")
 
+        taxi_records_df["PULocationID"] = taxi_records_df["PULocationID"].astype("Int64")
+        taxi_lookup_df["LocationID"] = taxi_lookup_df["LocationID"].astype("Int64")
+
         enriched_taxi_records_df = taxi_records_df.merge(
-            taxi_lookup_df[["LocationID", "Borough", "Zone"]].rename(columns={
-                "LocationID": "PULocationID",
-                "Borough":"borough",
-                "Zone":"zone"
-                }),
-            on="PULocationID", how="left"
+            taxi_lookup_df[["LocationID", "Borough", "Zone"]],
+            left_on="PULocationID",
+            right_on="LocationID",
+            how="left"
+        )
+
+        # Optionally rename for consistency
+        enriched_taxi_records_df = enriched_taxi_records_df.rename(
+            columns={"Borough": "borough", "Zone": "zone"}
         )
 
         return enriched_taxi_records_df
@@ -120,7 +126,7 @@ with DAG(
         enriched_taxi_records_df["trip_duration_min"] = (delta / pd.Timedelta("1min")).round(2)
 
         summary_df = (
-            enriched_taxi_records_df.groupby("PULocationID")[["trip_duration_min"]]
+            enriched_taxi_records_df.groupby(["PULocationID",  "borough", "zone"])[["trip_duration_min"]]
                 .mean()
                 .reset_index()
                 .rename(columns={

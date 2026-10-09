@@ -13,6 +13,7 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
+      - ./data:/data
       - ./airflow_passwords.json:/opt/airflow/simple_auth_manager_passwords.json.generated
 
     ports:
@@ -38,5 +39,6 @@ services:
         POSTGRES_DSN: postgresql://postgres:postgres@postgres:5432/summary
     volumes:
       - ./dashboard:/app
+      - ./data:/app/data
     ports:
       - 8501:8501/tcp

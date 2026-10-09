@@ -84,6 +84,8 @@ certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
+    #   pyogrio
+    #   pyproj
     #   requests
 cffi==2.1.1 ; platform_python_implementation != 'PyPy'
     # via cryptography
@@ -125,6 +127,8 @@ fsspec==2026.9.0
     # via
     #   apache-airflow-task-sdk
     #   universal-pathlib
+geopandas==1.2.0
+    # via taxi-longest-trip
 googleapis-common-protos==1.75.5
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
@@ -210,7 +214,11 @@ msgspec==0.22.0
 natsort==8.4.0
     # via apache-airflow-core
 numpy==2.5.3
-    # via pandas
+    # via
+    #   geopandas
+    #   pandas
+    #   pyogrio
+    #   shapely
 opentelemetry-api==1.45.1
     # via
     #   apache-airflow-core
@@ -255,8 +263,12 @@ packaging==26.3
     # via
     #   apache-airflow-core
     #   apache-airflow-task-sdk
+    #   geopandas
+    #   pyogrio
 pandas==3.0.6
-    # via taxi-longest-trip
+    # via
+    #   geopandas
+    #   taxi-longest-trip
 pathlib-abc==0.5.2
     # via universal-pathlib
 pathspec==1.1.1
@@ -315,6 +327,10 @@ pygtrie==2.6.2
     #   apache-airflow-task-sdk
 pyjwt==2.15.1
     # via apache-airflow-core
+pyogrio==0.13.0
+    # via geopandas
+pyproj==3.8.0
+    # via geopandas
 python-daemon==3.1.2
     # via apache-airflow-core
 python-dateutil==2.9.0.post0
@@ -366,6 +382,8 @@ rpds-py==2026.9.1
     #   referencing
 setproctitle==1.3.8
     # via apache-airflow-core
+shapely==2.2.0
+    # via geopandas
 shellingham==1.5.4
     # via typer
 six==1.17.0

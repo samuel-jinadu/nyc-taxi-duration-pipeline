@@ -9,7 +9,7 @@ dependencies = [
     "SQLAlchemy>=2.1.4",
     "psycopg2-binary>=2.9.9",
     "apache-airflow-providers-postgres>=4.0.0",
-    "geopandas>=1.2.0"
+    "geopandas>=1.0.0"
 ]
 
 [dependency-groups]
@@ -30,5 +30,6 @@ streamlit = [
     "psycopg[binary]>=3.3.6",
     "pandas>=3.0.6",
     "streamlit>=1.65.0",
-    "streamlit-autorefresh>=1.0.1"
+    "streamlit-autorefresh>=1.0.1",
+    "pydeck>=0.9.3"
 ]
