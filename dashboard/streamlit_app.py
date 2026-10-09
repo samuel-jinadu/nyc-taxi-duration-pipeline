@@ -14,8 +14,19 @@ st.header("Which NYC taxi pickup zones have the longest average trip durations?"
 
 try:
     with psycopg.connect(POSTGRES_DSN) as conn:
-        df = pd.read_sql_query("SELECT * FROM taxi_zone_durations ORDER BY taxi_zone_durations DESC", conn)
-    st.dataframe(df, width="stretch", hide_index=True)
+        df = pd.read_sql_query("SELECT zone, borough, avg_duration_mins FROM taxi_zone_durations ORDER BY avg_duration_mins DESC", conn)
+        st.dataframe(df, width="stretch", hide_index=True)
+
+        df = pd.read_sql_query("SELECT * FROM taxi_zone_durations ORDER BY avg_duration_mins DESC", conn)
+
+        st.map(
+            df.dropna(subset=["lat", "lon"]),
+            latitude="lat",
+            longitude="lon",
+            size="avg_duration_seconds",
+            color="#e4572e",
+            zoom=9,
+        )
 except errors.UndefinedTable:
     st.info("Table `taxi_zone_durations` does not exist yet. Waiting for the Airflow DAG to run…")
 except psycopg.OperationalError as e:

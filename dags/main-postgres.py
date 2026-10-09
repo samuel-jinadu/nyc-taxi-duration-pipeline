@@ -5,6 +5,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 import pendulum
 import pandas as pd
 # import pyarrow
+import geopandas as gpd
 from pyarrow import parquet, csv
 from airflow.sdk.bases.hook import BaseHook
 from sqlalchemy import create_engine, text
@@ -24,24 +25,56 @@ with DAG(
     catchup = False,
     default_args = default_args
 ):
-    download_script = """
-
-    DATA_YEAR=2026
-    month="01"
-    url_prefix="https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_${DATA_YEAR}"
-    wget "${url_prefix}-${month}.parquet" -O "/data/taxi-data-raw.parquet"
-
+    download_yellow_taxi_trip_records_script = """
+        DATA_YEAR=2026
+        month="01"
+        url_prefix="https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_${DATA_YEAR}"
+        wget "${url_prefix}-${month}.parquet" -O "/data/taxi-data-raw.parquet"
     """
 
-    download_taxi_data = BashOperator(
-        task_id = "download_taxi_data", 
-        bash_command = download_script
+    download_yellow_taxi_trip_records = BashOperator(
+        task_id = "download_yellow_taxi_trip_records", 
+        bash_command = download_yellow_taxi_trip_records_script
     )
+
+    download_taxi_zone_lookup_script = """
+        url="https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+        wget "${url}" -O "/data/taxi-zone-lookup.csv"
+    """
+
+    download_taxi_zone_lookup = BashOperator(
+            task_id = "download_taxi_zone_lookup", 
+            bash_command = download_taxi_zone_lookup_script
+        )
+
+    get_taxi_shapefile_script = """
+        url = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
+        wget "${url}" -O "/data/taxi-zones.zip"
+        python -c "import zipfile; zipfile.ZipFile('/data/taxi-zones.zip').extractall('/data/taxi-zones')"
+    """
+
+    get_taxi_shapefile = BashOperator(
+            task_id = "get_taxi_shapefile", 
+            bash_command = get_taxi_shapefile_script
+        )
+
+    def _convert_shapefile_to_geojson():
+        shapefile_path = "/data/taxi-zones/taxi_zones.shp"
+        geojson_path = "/data/taxi-zones.geojson"
+        gdf = gpd.read_file(shapefile_path).to_crs(4326)
+        gdf.to_file(geojson_path, driver="GeoJSON")
+
+    convert_shapefile_to_geojson = PythonOperator(
+        task_id = "convert_shapefile_to_geojson",
+        python_callable = _convert_shapefile_to_geojson
+    )
+    
+
 
     def _convert_pq_to_csv():
         columns=["tpep_pickup_datetime","tpep_dropoff_datetime","trip_distance","PULocationID","DOLocationID"]
         
-        table = parquet .read_table(f"/data/taxi-data-raw.parquet", columns=columns)
+        table = parquet.read_table(f"/data/taxi-data-raw.parquet", columns=columns)
         csv.write_csv(table, "/data/taxi-data-raw.csv")
 
     convert_parquet_to_csv = PythonOperator(
@@ -49,32 +82,60 @@ with DAG(
         python_callable = _convert_pq_to_csv
     )
 
-    def _transform_taxi_data():
-        """Average trip duration per pickup zone"""
-        df = pd.read_csv("/data/taxi-data-raw.csv")
+    def _enrich_taxi_trip_records()-> pd.DataFrame:
+        taxi_records_df = pd.read_csv("/data/taxi-data-raw.csv")
+        taxi_lookup_df = pd.read_csv("/data/taxi-zone-lookup.csv")
 
-        df["trip_duration"] = (
-            pd.to_datetime(df["tpep_dropoff_datetime"]) 
-            - pd.to_datetime(df["tpep_pickup_datetime"])
+        enriched_taxi_records_df = taxi_records_df.merge(
+            taxi_lookup_df[["LocationID", "Borough", "Zone"]].rename(columns={
+                "LocationID": "PULocationID",
+                "Borough":"borough",
+                "Zone":"zone"
+                }),
+            on="PULocationID", how="left"
+        )
+
+        return enriched_taxi_records_df
+
+    def _enrich_taxi_summary(summary_df: pd.DataFrame)-> pd.DataFrame:
+        gdf = gpd.read_file("/data/taxi-zones.geojson").to_crs(4326)
+        pts = gdf.geometry.representative_point()
+        centroids = pd.DataFrame({
+            "pickup_locationid": gdf["LocationID"].astype(int),
+            "lat": pts.y.astype(float),
+            "lon": pts.x.astype(float),
+        })
+        return summary_df.merge(centroids, on="pickup_locationid", how="left")
+
+
+    def _transform_taxi_trip_records():
+        """Average trip duration per pickup zone"""
+        enriched_taxi_records_df = _enrich_taxi_trip_records()
+
+        delta = (
+            pd.to_datetime(enriched_taxi_records_df["tpep_dropoff_datetime"]) 
+            - pd.to_datetime(enriched_taxi_records_df["tpep_pickup_datetime"])
             )
-        df["trip_duration"] = df["trip_duration"].dt.total_seconds()
+        # enriched_taxi_records_df["trip_duration"] = delta.dt.total_seconds().round(2)
+        enriched_taxi_records_df["trip_duration_min"] = (delta / pd.Timedelta("1min")).round(2)
 
         summary_df = (
-            df.groupby("PULocationID")["trip_duration"]
+            enriched_taxi_records_df.groupby("PULocationID")[["trip_duration_min"]]
                 .mean()
                 .reset_index()
                 .rename(columns={
-                    "trip_duration": "avg_duration_seconds", 
-                    "PULocationID": "pickup_locationid"
+                    "PULocationID": "pickup_locationid",
+                    "trip_duration_min":"avg_duration_mins"
                     })
             )
 
+        summary_df = _enrich_taxi_summary(summary_df)
         summary_df.to_csv("/data/taxi_summary.csv", index=False)
         print(f"Computed averages for {len(summary_df)} zones")
 
     transform_taxi_data = PythonOperator(
         task_id = "transform_taxi_data", 
-        python_callable = _transform_taxi_data
+        python_callable = _transform_taxi_trip_records
     )
 
     def _load_to_database(**context):
@@ -89,8 +150,13 @@ with DAG(
             query1 = """
                 CREATE TABLE IF NOT EXISTS taxi_zone_durations (
                     pickup_locationid INTEGER,
-                    avg_duration_seconds FLOAT,
-                    execution_date DATE
+                    avg_duration_mins FLOAT,
+                    trip_count           INTEGER,
+                    zone                 TEXT,
+                    borough              TEXT,
+                    lat                  FLOAT,
+                    lon                  FLOAT,
+                    execution_date       DATE
                 );
             """
             conn.execute(text(query1))
@@ -109,4 +175,6 @@ with DAG(
     
 
 
-    download_taxi_data >> convert_parquet_to_csv >> transform_taxi_data >> load_to_postgres
+    download_yellow_taxi_trip_records >> convert_parquet_to_csv >> transform_taxi_data >> load_to_postgres
+    download_taxi_zone_lookup >> transform_taxi_data
+    get_taxi_shapefile >> convert_shapefile_to_geojson >> transform_taxi_data
