@@ -14,17 +14,17 @@ st.set_page_config(page_title="NYC Taxi Zone Durations", layout="wide")
 st_autorefresh(interval=5000, key="data_refresh")
 
 
-
+@st.cache_data
+def load_zones():
+    with open("/app/data/taxi-zones.geojson") as f:
+        return json.load(f)
 
 
 def make_map():
     df = pd.read_sql_query("SELECT * FROM taxi_zone_durations ORDER BY avg_duration_mins DESC", conn)
     max_dur = float(df["avg_duration_mins"].max())
 
-    @st.cache_data
-    def load_zones():
-        with open("/app/data/taxi-zones.geojson") as f:
-            return json.load(f)
+    
 
     def ramp(v):
         if v is None or pd.isna(v):
@@ -61,7 +61,10 @@ def make_map():
         pdk.Deck(
             layers=[layer],
             initial_view_state=pdk.ViewState(latitude=40.73, longitude=-73.95, zoom=9.5),
-            tooltip={"html": "<b>{zone_name}</b><br/>Avg duration: {avg_duration} s"},
+            tooltip={
+            "html": "<b>{properties.zone_name}</b><br/>Avg duration: {properties.avg_duration} mins",
+            "style": {"backgroundColor": "steelblue", "color": "white"},
+        },
         ),
         use_container_width=True,
     )
