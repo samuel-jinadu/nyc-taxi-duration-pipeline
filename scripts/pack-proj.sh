@@ -62,6 +62,7 @@ find . \
         -name .tox -o \
         -name .eggs -o \
         -name logs -o \
+        -name taxi_zones -o \
         -name "*.egg-info" -o \
         -name htmlcov -o \
         -name build -o \
@@ -72,6 +73,8 @@ find . \
     \( -type d -printf "[DIR]  %p\n" \) -o \
     \( -type f \
         ! -name "*.pyc" \
+        ! -name "taxi-zones.zip" \
+        ! -name "taxi-zones.geojson" \
         ! -name "*.pyo" \
         ! -name "*.pyd" \
         ! -name "*.so" \
