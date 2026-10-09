@@ -49,42 +49,7 @@ The zone reference exists as a CSV lookup *and* as an ESRI Shapefile (`.shp/.dbf
 ---
 
 ## Architecture
-
-```mermaid
-flowchart LR
-    subgraph Sources["Public Data Sources (NYC TLC / CloudFront)"]
-        A1[yellow_tripdata_*.parquet]
-        A2[taxi_zone_lookup.csv]
-        A3[taxi_zones.zip / .shp]
-    end
-
-    subgraph Airflow["Airflow DAG: main-with-postgres"]
-        B1[download_yellow_taxi_trip_records]
-        B2[download_taxi_zone_lookup]
-        B3[get_taxi_shapefile]
-        C1[convert_parquet_to_csv]
-        C2[convert_shapefile_to_geojson]
-        D1[transform_taxi_data]
-        E1[load_to_postgres]
-    end
-
-    subgraph Storage["Storage"]
-        F1[(/data volume)]
-        F2[(PostgreSQL\ntaxi_zone_durations)]
-    end
-
-    subgraph Serving["Serving"]
-        G1[Streamlit Dashboard]
-    end
-
-    A1 --> B1 --> C1 --> D1
-    A2 --> B2 --> D1
-    A3 --> B3 --> C2 --> D1
-    D1 --> E1 --> F2 --> G1
-    B1 -.-> F1
-    B2 -.-> F1
-    B3 -.-> F1
-```
+![Architecture Diagram](architecture.jpg)
 
 The Airflow DAG runs three independent download tasks in parallel, fans into two format-conversion tasks, then converges on a single transform + load path.
 
